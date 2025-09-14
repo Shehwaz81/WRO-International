@@ -131,15 +131,30 @@ async def line(Speed, Distance, Side):
     DriveDk = 0.3
     DrivePk = 1
     DriveIk = 0.0001
+    IntegralCap = 100;
     while Distance >= db.distance() - Dist:
         await wait(0)
         DriveError = await linesens.reflection() - target
+        
         if DriveError == 0:
             DriveIntegral = 0
         else:
             DriveIntegral = DriveIntegral + DriveError
+
+        if DriveIntegral > IntegralCap:
+            DriveIntegral = IntegralCap
+        elif DriveIntegral < -IntegralCap:
+            DriveIntegral = -IntegralCap
+            
         DriveDerivative = DriveError - DrivePastError
+        
         DriveCorrection = Side * ((DrivePk * DriveError + DriveDk * DriveDerivative) + DriveIntegral * DriveIk)
+
+    # maybe increse drive correction when drive error is more?
+
+        if abs(DriveError) > 30:
+            DriveCorrection *= 1.2
+        
         db.drive(Speed, DriveCorrection)
         DrivePastError = DriveError
         RealDist = db.distance() - Dist
