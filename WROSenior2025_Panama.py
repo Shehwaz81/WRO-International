@@ -123,13 +123,17 @@ async def line(Speed, Distance, Side):
     global Dist, DriveDk, DrivePk, DriveIk, DriveError, DriveIntegral, DriveDerivative, DriveCorrection, DrivePastError, RealDist
     await wait(0)
     db.use_gyro(False)
+
+    white = 100, black = 0
+    target = (white + black) / 2
+    
     Dist = db.distance()
     DriveDk = 0.3
     DrivePk = 1
     DriveIk = 0.0001
     while Distance >= db.distance() - Dist:
         await wait(0)
-        DriveError = await linesens.reflection() - 50
+        DriveError = await linesens.reflection() - target
         if DriveError == 0:
             DriveIntegral = 0
         else:
