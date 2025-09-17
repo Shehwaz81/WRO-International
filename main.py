@@ -21,25 +21,33 @@ print("Huskylens connected is", huskylens.knock())
 huskylens.set_alg(ALGORITHM_COLOR_RECOGNITION)
 huskylens.show_text("Hello LMS-ESP32 !")    
 
+last_block1_ID, last_block2_ID = 0, 0
+frames_missing = 0
+
 while True:
     blocks = huskylens.get_blocks()
-
-    if len(blocks) == 1:
+    valid_blocks = []
+    for b in blocks:
+        if b.width > 5 and b.height > 5:
+            valid_blocks.append(b)
+    
+    if len(valid_blocks) == 1:
+        block1, = valid_blocks
         block1_detected = 1
         block2_detected = 0
-        block1 = blocks[0]
         block1pos = 1
         block1_ID = block1.ID
         block2_ID = 0
         block2pos = 0
+        frames_missing = 0;
 
-    elif len(blocks) == 2:
+    elif len(valid_blocks) == 2:
         block1_detected = 1
         block2_detected = 1
-        block1 = blocks[0]
-        block2 = blocks[1]
+        block1, block2 = valid_blocks
         block1_ID = block1.ID
         block2_ID = block2.ID
+        frames_missing = 0;
         if block1.x < block2.x:
             block1pos = 1  # left
             block2pos = 2  # right
@@ -47,58 +55,37 @@ while True:
             block1pos = 2
             block2pos = 1
 
-    elif len(blocks) >= 3:
-        # Pick the TWO blocks with the SMALLEST y (topmost two) — no imports
-        top1 = None  # best (smallest y)
-        top2 = None  # second best
-        y1 = 10**9
-        y2 = 10**9
-
-        for b in blocks:
-            y = b.y
-            if y < y1:
-                top2, y2 = top1, y1
-                top1, y1 = b, y
-            elif y < y2:
-                top2, y2 = b, y
-
-        # If we somehow didn't find two (shouldn't happen), fall back gracefully
-        if top1 is None or top2 is None:
-            block1_ID = 0
-            block2_ID = 0
-            block1pos = 0
-            block2pos = 0
-            block1_detected = 0
-            block2_detected = 0
-        else:
-            block1_detected = 1
-            block2_detected = 1
-
-            # Order them by x so we can label left/right for the hub
-            if top1.x < top2.x:
-                left_block, right_block = top1, top2
-            else:
-                left_block, right_block = top2, top1
-
-            block1 = left_block
-            block2 = right_block
-
-            block1_ID = block1.ID
-            block2_ID = block2.ID
-            block1pos = 1  # left
-            block2pos = 2  # right
-
+    elif len(valid_blocks) >= 3:
+        top2 = sorted(valid_blocks, key=lambda b: b.y)[:2]
+    
+        # Order them left/right by x
+        left_block, right_block = sorted(top2, key=lambda b: b.x)
+    
+        block1 = left_block
+        block2 = right_block
+    
+        block1_ID = block1.ID
+        block2_ID = block2.ID
+        block1pos = 1
+        block2pos = 2
+        block1_detected = 1
+        block2_detected = 1
+        frames_missing = 0;
     else:
-        block1_ID = 0
-        block2_ID = 0
-        block1pos = 0
-        block2pos = 0
-        block1_detected = 0
-        block2_detected = 0
+        frames_missing += 1
+        if frames_missing < 3:
+            block1_ID, block2_ID = last_block1_ID, last_block2_ID
+        else:
+            frames_missing = 0
+            block1pos, block2pos = 0, 0
+            block1_ID, block2_ID = 0, 0
     
     pr.update_channel('bloca', block1pos, block1_ID)
     pr.update_channel('blocb', block2pos, block2_ID)
     pr.process()
+
+    last_block1_ID, last_block2_ID = block1_ID, block2_ID
+    time.sleep(0.05)
 
 
 
